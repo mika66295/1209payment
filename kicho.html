@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>簡易記帳ソフト</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    h1 { text-align: center; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background-color: #f0f0f0; }
+    input, select { width: 100%; padding: 6px; margin: 4px 0; }
+    .total { font-size: 1.2em; font-weight: bold; text-align: right; margin-top: 20px; }
+    .warning { color: red; font-weight: bold; text-align: right; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>簡易記帳ソフト</h1>
+
+  <div class="total">
+    総額: <span id="totalAmount">0</span> 円 ／ 予算: <span id="budgetAmount">250000</span> 円 ／ 残り: <span id="remainingAmount">250000</span> 円
+  </div>
+  <div id="warningMessage" class="warning" style="display: none;">※ 残り予算が15万円を下回りました！ご注意ください。</div>
+
+  <form id="expenseForm">
+    <label>項目:
+      <select name="category" required>
+        <option value="娯楽">娯楽</option>
+        <option value="飲食">飲食</option>
+        <option value="支払い">支払い</option>
+        <option value="その他">その他</option>
+      </select>
+    </label><br>
+
+    <label>詳細: <input type="text" name="detail" required></label><br>
+    <label>支払者:
+      <select name="payer" required>
+        <option value="mika">mika</option>
+        <option value="业仔">业仔</option>
+      </select>
+    </label><br>
+    <label>日付: <input type="date" name="date" required></label><br>
+    <label>金額 (円): <input type="number" name="amount" required></label><br>
+    <button type="submit">追加</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>項目</th><th>詳細</th><th>支払者</th><th>日付</th><th>金額 (円)</th>
+      </tr>
+    </thead>
+    <tbody id="expenseTable">
+    </tbody>
+  </table>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDP-LXktzp-CH9xGwu1BZy4bY0oD47jHyo",
+      authDomain: "my-kicho-app.firebaseapp.com",
+      projectId: "my-kicho-app",
+      storageBucket: "my-kicho-app.firebasestorage.app",
+      messagingSenderId: "404418394240",
+      appId: "1:404418394240:web:ba24a8d767ba96e18b0e65",
+      measurementId: "G-CT5BFZXBSB"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const form = document.getElementById('expenseForm');
+    const table = document.getElementById('expenseTable');
+    const totalDisplay = document.getElementById('totalAmount');
+    const budgetDisplay = document.getElementById('budgetAmount');
+    const remainingDisplay = document.getElementById('remainingAmount');
+    const warningMessage = document.getElementById('warningMessage');
+
+    let total = 0;
+    const budget = 250000;
+
+    function updateDisplays() {
+      totalDisplay.textContent = total;
+      const remaining = budget - total;
+      remainingDisplay.textContent = remaining;
+      warningMessage.style.display = remaining < 150000 ? 'block' : 'none';
+    }
+
+    function renderRow(data) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${data.category}</td>
+        <td>${data.detail}</td>
+        <td>${data.payer}</td>
+        <td>${data.date}</td>
+        <td>${data.amount}</td>
+      `;
+      table.appendChild(row);
+      total += parseInt(data.amount);
+    }
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const data = {
+        category: form.category.value,
+        detail: form.detail.value,
+        payer: form.payer.value,
+        date: form.date.value,
+        amount: parseInt(form.amount.value)
+      };
+
+      await db.collection("expenses").add(data);
+      renderRow(data);
+      updateDisplays();
+      form.reset();
+    });
+
+    async function loadExpenses() {
+      const snapshot = await db.collection("expenses").get();
+      snapshot.forEach(doc => {
+        renderRow(doc.data());
+      });
+      updateDisplays();
+    }
+
+    loadExpenses();
+  </script>
+</body>
+</html>
