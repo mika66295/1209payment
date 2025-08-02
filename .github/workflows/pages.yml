@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy static site to GitHub Pages
 
 on:
   push:
@@ -21,16 +21,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3   # ← ← ← 这里改成 v3
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v2
         with:
-          path: .
+          path: .  # 注意：如果你网站文件都在某个子目录比如 dist/，请写成 dist
 
       - name: Deploy to GitHub Pages
         id: deployment
