@@ -53,8 +53,7 @@
         <th>項目</th><th>詳細</th><th>支払者</th><th>日付</th><th>金額 (円)</th>
       </tr>
     </thead>
-    <tbody id="expenseTable">
-    </tbody>
+    <tbody id="expenseTable"></tbody>
   </table>
 
   <script>
@@ -62,11 +61,12 @@
       apiKey: "AIzaSyDP-LXktzp-CH9xGwu1BZy4bY0oD47jHyo",
       authDomain: "my-kicho-app.firebaseapp.com",
       projectId: "my-kicho-app",
-      storageBucket: "my-kicho-app.firebasestorage.app",
+      storageBucket: "my-kicho-app.appspot.com",
       messagingSenderId: "404418394240",
       appId: "1:404418394240:web:ba24a8d767ba96e18b0e65",
       measurementId: "G-CT5BFZXBSB"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -100,6 +100,7 @@
       total += parseInt(data.amount);
     }
 
+    // 提交表单并写入 Firestore
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
 
@@ -112,20 +113,20 @@
       };
 
       await db.collection("expenses").add(data);
-      renderRow(data);
-      updateDisplays();
       form.reset();
     });
 
-    async function loadExpenses() {
-      const snapshot = await db.collection("expenses").get();
+    // 实时监听 Firestore 更新
+    db.collection("expenses").orderBy("date", "desc").onSnapshot(snapshot => {
+      table.innerHTML = '';
+      total = 0;
+
       snapshot.forEach(doc => {
         renderRow(doc.data());
       });
-      updateDisplays();
-    }
 
-    loadExpenses();
+      updateDisplays();
+    });
   </script>
 </body>
 </html>
