@@ -15,18 +15,21 @@
     input, select { width: 100%; padding: 6px; margin: 4px 0; }
     .total { font-size: 1.2em; font-weight: bold; text-align: right; margin-top: 20px; }
     .warning { color: red; font-weight: bold; text-align: right; margin-top: 10px; }
-    button { margin: 0 4px; }
+    button.edit, button.delete { margin: 0 2px; }
   </style>
 </head>
 <body>
   <h1>簡易記帳ソフト</h1>
 
   <div class="total">
-    総額: <span id="totalAmount">0</span> 円 ／ 予算: <span id="budgetAmount">250000</span> 円 ／ 残り: <span id="remainingAmount">250000</span> 円
+    総額: <span id="totalAmount">0</span> 円 ／
+    予算: <span id="budgetAmount">250000</span> 円 ／
+    残り: <span id="remainingAmount">250000</span> 円
   </div>
   <div id="warningMessage" class="warning" style="display: none;">※ 残り予算が15万円を下回りました！ご注意ください。</div>
 
   <form id="expenseForm">
+    <input type="hidden" name="editId" id="editId">
     <label>項目:
       <select name="category" required>
         <option value="娯楽">娯楽</option>
@@ -35,7 +38,6 @@
         <option value="その他">その他</option>
       </select>
     </label><br>
-
     <label>詳細: <input type="text" name="detail" required></label><br>
     <label>支払者:
       <select name="payer" required>
@@ -45,13 +47,13 @@
     </label><br>
     <label>日付: <input type="date" name="date" required></label><br>
     <label>金額 (円): <input type="number" name="amount" required></label><br>
-    <button type="submit">追加 / 更新</button>
+    <button type="submit">追加</button>
   </form>
 
   <table>
     <thead>
       <tr>
-        <th>項目</th><th>詳細</th><th>支払者</th><th>日付</th><th>金額 (円)</th><th>操作</th>
+        <th>項目</th><th>詳細</th><th>支払者</th><th>日付</th><th>金額</th><th>操作</th>
       </tr>
     </thead>
     <tbody id="expenseTable"></tbody>
@@ -62,7 +64,7 @@
       apiKey: "AIzaSyDP-LXktzp-CH9xGwu1BZy4bY0oD47jHyo",
       authDomain: "my-kicho-app.firebaseapp.com",
       projectId: "my-kicho-app",
-      storageBucket: "my-kicho-app.firebasestorage.app",
+      storageBucket: "my-kicho-app.appspot.com",
       messagingSenderId: "404418394240",
       appId: "1:404418394240:web:ba24a8d767ba96e18b0e65",
       measurementId: "G-CT5BFZXBSB"
@@ -79,7 +81,6 @@
 
     let total = 0;
     const budget = 250000;
-    let editingId = null;
 
     function updateDisplays() {
       totalDisplay.textContent = total;
@@ -88,10 +89,9 @@
       warningMessage.style.display = remaining < 150000 ? 'block' : 'none';
     }
 
-    function renderRow(doc) {
-      const data = doc.data();
+    function renderRow(data, id) {
       const row = document.createElement('tr');
-      row.setAttribute('data-id', doc.id);
+      row.setAttribute('data-id', id);
       row.innerHTML = `
         <td>${data.category}</td>
         <td>${data.detail}</td>
@@ -99,37 +99,17 @@
         <td>${data.date}</td>
         <td>${data.amount}</td>
         <td>
-          <button onclick="editEntry('${doc.id}')">編集</button>
-          <button onclick="deleteEntry('${doc.id}', ${data.amount})">削除</button>
+          <button class="edit" onclick="editExpense('${id}')">編集</button>
+          <button class="delete" onclick="deleteExpense('${id}')">削除</button>
         </td>
       `;
       table.appendChild(row);
       total += parseInt(data.amount);
     }
 
-    async function deleteEntry(id, amount) {
-      await db.collection("expenses").doc(id).delete();
-      const row = document.querySelector(`tr[data-id="${id}"]`);
-      if (row) row.remove();
-      total -= amount;
-      updateDisplays();
-    }
-
-    async function editEntry(id) {
-      const doc = await db.collection("expenses").doc(id).get();
-      if (doc.exists) {
-        const data = doc.data();
-        form.category.value = data.category;
-        form.detail.value = data.detail;
-        form.payer.value = data.payer;
-        form.date.value = data.date;
-        form.amount.value = data.amount;
-        editingId = id;
-      }
-    }
-
-    form.addEventListener('submit', async function (e) {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
+
       const data = {
         category: form.category.value,
         detail: form.detail.value,
@@ -138,30 +118,45 @@
         amount: parseInt(form.amount.value)
       };
 
-      if (editingId) {
-        const oldDoc = await db.collection("expenses").doc(editingId).get();
-        const oldAmount = oldDoc.exists ? parseInt(oldDoc.data().amount) : 0;
-        await db.collection("expenses").doc(editingId).set(data);
-        total -= oldAmount;
-        total += data.amount;
-        table.innerHTML = '';
-        editingId = null;
-        loadExpenses();
-      } else {
-        const newDoc = await db.collection("expenses").add(data);
-        renderRow({ id: newDoc.id, data: () => data });
-      }
+      const editId = document.getElementById('editId').value;
 
-      updateDisplays();
-      form.reset();
+      if (editId) {
+        await db.collection("expenses").doc(editId).update(data);
+        form.reset();
+        document.getElementById('editId').value = "";
+      } else {
+        await db.collection("expenses").add(data);
+        form.reset();
+      }
     });
 
-    async function loadExpenses() {
-      table.innerHTML = '';
-      total = 0;
-      const snapshot = await db.collection("expenses").orderBy("date").get();
-      snapshot.forEach(doc => renderRow(doc));
-      updateDisplays();
+    function editExpense(id) {
+      const row = document.querySelector(`tr[data-id="${id}"]`);
+      const cells = row.querySelectorAll("td");
+
+      form.category.value = cells[0].textContent;
+      form.detail.value = cells[1].textContent;
+      form.payer.value = cells[2].textContent;
+      form.date.value = cells[3].textContent;
+      form.amount.value = cells[4].textContent;
+      document.getElementById("editId").value = id;
+    }
+
+    async function deleteExpense(id) {
+      if (confirm("本当に削除しますか？")) {
+        await db.collection("expenses").doc(id).delete();
+      }
+    }
+
+    function loadExpenses() {
+      db.collection("expenses").orderBy("date").onSnapshot(snapshot => {
+        table.innerHTML = "";
+        total = 0;
+        snapshot.forEach(doc => {
+          renderRow(doc.data(), doc.id);
+        });
+        updateDisplays();
+      });
     }
 
     loadExpenses();
